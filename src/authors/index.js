@@ -10,6 +10,10 @@ const filePath = fileURLToPath(import.meta.url)
 const currentFolderPath = dirname(filePath)
 const authorsJSONPath = join(currentFolderPath, "authors.json")
 
+const parentFolder = dirname(currentFolderPath)
+const blogPostsfolder = join(parentFolder, "blogPosts")
+const blogPostJsonPath = join(blogPostsfolder, "blogPosts.json")
+
 authorRouter.get("/", (req, res) => {
   const authorsBuffer = fs.readFileSync(authorsJSONPath)
   const authors = JSON.parse(authorsBuffer)
@@ -29,6 +33,16 @@ authorRouter.get("/:id", (req, res) => {
   const authors = JSON.parse(fs.readFileSync(authorsJSONPath))
   const author = authors.find((a) => a._id === req.params.id)
   res.send(author)
+})
+
+authorRouter.get("/:id/blogPosts", (req, res) => {
+  console.log("getting autor posts")
+  const authors = JSON.parse(fs.readFileSync(authorsJSONPath))
+  const posts = JSON.parse(fs.readFileSync(blogPostJsonPath))
+  console.log(posts)
+  const author = authors.find((a) => a._id === req.params.id)
+  const filteredPosts = posts.filter((p) => p.author.name === author.name)
+  res.send(filteredPosts)
 })
 
 authorRouter.put("/:id", (req, res) => {
