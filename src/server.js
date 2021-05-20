@@ -2,7 +2,10 @@ import express from "express"
 import listEndpoints from "express-list-endpoints"
 import cors from "cors"
 import authorsRoutes from "./authors/index.js"
+import { join } from "path"
 import postsRoutes from "./blogPosts/index.js"
+import filesRoutes from "./files/index.js"
+import { getCurrentFolderPath } from "./lib/fs-tools.js"
 import {
   badRequestErrorHandler,
   notFoundErrorHandler,
@@ -14,7 +17,13 @@ const server = express()
 
 const port = 3001
 
+const publicFolderPath = join(
+  getCurrentFolderPath(import.meta.url),
+  "../public"
+)
+
 // *********MIDDLEWARES*********
+server.use(express.static(publicFolderPath))
 server.use(express.json())
 server.use(cors())
 

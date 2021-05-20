@@ -1,69 +1,103 @@
 import express from "express"
 import fs from "fs"
-import { fileURLToPath } from "url"
-import { dirname, join } from "path"
 import uniqid from "uniqid"
+import createError from "http-errors"
+import { getAuthors, writeAuthors } from "../lib/fs-tools.js"
+import multer from "multer"
+import { writeAuthorImg, writePostCover } from "../lib/fs-tools.js"
 
 const authorRouter = express.Router()
 
-const filePath = fileURLToPath(import.meta.url)
-const currentFolderPath = dirname(filePath)
-const authorsJSONPath = join(currentFolderPath, "authors.json")
-
-const parentFolder = dirname(currentFolderPath)
-const blogPostsfolder = join(parentFolder, "blogPosts")
-const blogPostJsonPath = join(blogPostsfolder, "blogPosts.json")
-
-authorRouter.get("/", (req, res) => {
-  const authorsBuffer = fs.readFileSync(authorsJSONPath)
-  const authors = JSON.parse(authorsBuffer)
-  res.send(authors)
+authorRouter.get("/", async (req, res, next) => {
+  try {
+    const authors = await getAuthors()
+    res.send(authors)
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
 })
 
-authorRouter.post("/", (req, res) => {
-  console.log(req.body)
-  const newAuthor = { ...req.body, _id: uniqid() }
-  const authors = JSON.parse(fs.readFileSync(authorsJSONPath))
-  authors.push(newAuthor)
-  fs.writeFileSync(authorsJSONPath, JSON.stringify(authors))
-  res.status(201).send(newAuthor)
+authorRouter.post("/", async (req, res, next) => {
+  try {
+    const authors = await getAuthors()
+    const newAuthor = { ...req.body, _id: uniqid(), createdAt: new Date() }
+    authors.push(newAuthor)
+    await writeAuthors(authors)
+
+    res.status(201).send({ _id: newAuthor._id })
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
 })
 
-authorRouter.get("/:id", (req, res) => {
-  const authors = JSON.parse(fs.readFileSync(authorsJSONPath))
-  const author = authors.find((a) => a._id === req.params.id)
-  res.send(author)
+authorRouter.get("/:id", async (req, res, next) => {
+  try {
+    const authors = await getAuthors()
+    const author = authors.find((a) => a._id === req.params.id)
+    if (author) {
+      res.send(author)
+    } else {
+      next(createError(404, "Author with this id not found"))
+    }
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
 })
 
-authorRouter.get("/:id/blogPosts", (req, res) => {
-  console.log("getting autor posts")
-  const authors = JSON.parse(fs.readFileSync(authorsJSONPath))
-  const posts = JSON.parse(fs.readFileSync(blogPostJsonPath))
-  console.log(posts)
-  const author = authors.find((a) => a._id === req.params.id)
-  const filteredPosts = posts.filter((p) => p.author.name === author.name)
-  res.send(filteredPosts)
+authorRouter.put("/:id", async (req, res, next) => {
+  try {
+    const authors = await getAuthors()
+    const remainAuthors = authors.filter((a) => a._id !== req.params.id)
+
+    const modifiedAuthor = {
+      ...req.body,
+      _id: req.params.id,
+      modifiedAt: new Date(),
+    }
+    remainAuthors.push(modifiedAuthor)
+    await writeAuthors(remainAuthors)
+    res.send(modifiedAuthor)
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
 })
 
-authorRouter.put("/:id", (req, res) => {
-  const authors = JSON.parse(fs.readFileSync(authorsJSONPath))
-  const remainingAuthors = authors.filter(
-    (author) => author._id !== req.params.id
-  )
-  console.log(authors)
-  const updatedAuthor = { ...req.body, _id: req.params.id }
-  remainingAuthors.push(updatedAuthor)
-  fs.writeFileSync(authorsJSONPath, JSON.stringify(remainingAuthors))
-  res.send(updatedAuthor)
+authorRouter.delete("/:id", async (req, res, next) => {
+  try {
+    const authors = await getAuthors()
+    const remainAuthors = authors.filter((a) => a._id !== req.params.id)
+
+    await writeAuthors(remainAuthors)
+    res.status(204).send(remainAuthors)
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
 })
 
-authorRouter.delete("/:id", (req, res) => {
-  const authors = JSON.parse(fs.readFileSync(authorsJSONPath))
-  const remainingAuthors = authors.filter(
-    (author) => author._id !== req.params.id
-  )
-  fs.writeFileSync(authorsJSONPath, JSON.stringify(remainingAuthors))
-  res.status(204).send()
-})
+authorRouter.post(
+  "/:id/uploadAvatar",
+  multer().single("avatar"),
+  async (req, res, next) => {
+    try {
+      console.log("trying to upload")
+      const authors = await getAuthors()
+      const author = authors.find((a) => a._id === req.params.id)
+      await writeAuthorImg(req.file.originalname, req.file.buffer)
+      author.img = `http://localhost:3001/img/authors/${req.file.originalname}`
+      const remainAuthors = authors.filter((a) => a._id !== req.params.id)
+      remainAuthors.push(author)
+      await writeAuthors(remainAuthors)
+      res.send()
+    } catch (error) {
+      console.log(error)
+      next(error)
+    }
+  }
+)
 
 export default authorRouter

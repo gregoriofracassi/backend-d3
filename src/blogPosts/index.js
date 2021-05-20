@@ -1,33 +1,21 @@
 import express from "express"
-import fs from "fs"
-import { fileURLToPath } from "url"
-import { dirname, join } from "path"
 import uniqid from "uniqid"
 import { bodyValidator } from "./validation.js"
 import { validationResult } from "express-validator"
 import createError from "http-errors"
-
-const postsJsonPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "blogPosts.json"
-)
-
-const getPosts = () => {
-  const content = fs.readFileSync(postsJsonPath)
-  return JSON.parse(content) // I'm getting back the actual array
-}
-
-const writePosts = (content) =>
-  fs.writeFileSync(postsJsonPath, JSON.stringify(content))
+import { getPosts, writePosts } from "../lib/fs-tools.js"
+import multer from "multer"
+import { writeAuthorImg, writePostCover } from "../lib/fs-tools.js"
 
 const postsRouter = express.Router()
 
-postsRouter.get("/", (req, res, next) => {
+postsRouter.get("/", async (req, res, next) => {
   try {
-    const posts = getPosts()
-    if (req.query.name) {
-      const filteredPosts = books.filter(
-        (book) => book.hasOwnProperty("title") && book.title === req.query.title
+    const posts = await getPosts()
+    if (req.query.title) {
+      //try to validate params and get req with them
+      const filteredPosts = posts.filter(
+        (post) => post.hasOwnProperty("title") && post.title === req.query.title
       )
       res.send(filteredPosts)
     } else {
@@ -39,9 +27,9 @@ postsRouter.get("/", (req, res, next) => {
   }
 })
 
-postsRouter.get("/:postId", (req, res, next) => {
+postsRouter.get("/:postId", async (req, res, next) => {
   try {
-    const posts = getPosts()
+    const posts = await getPosts()
     const post = posts.find((p) => p._id === req.params.postId)
     if (post) {
       res.send(post)
@@ -54,16 +42,21 @@ postsRouter.get("/:postId", (req, res, next) => {
   }
 })
 
-postsRouter.post("/", bodyValidator, (req, res, next) => {
+postsRouter.post("/", bodyValidator, async (req, res, next) => {
   try {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
       next(createError(400, { errorList: errors }))
     } else {
-      const posts = getPosts()
-      const newPost = { ...req.body, _id: uniqid(), createdAt: new Date() }
+      const posts = await getPosts()
+      const newPost = {
+        ...req.body,
+        _id: uniqid(),
+        createdAt: new Date(),
+        comments: [],
+      }
       posts.push(newPost)
-      writePosts(posts)
+      await writePosts(posts)
 
       res.status(201).send({ id: newPost._id })
     }
@@ -73,9 +66,9 @@ postsRouter.post("/", bodyValidator, (req, res, next) => {
   }
 })
 
-postsRouter.put("/:postId", (req, res, next) => {
+postsRouter.put("/:postId", bodyValidator, async (req, res, next) => {
   try {
-    const posts = getPosts()
+    const posts = await getPosts()
     const remainingPosts = posts.filter((p) => p._id !== req.params.postId)
 
     const modifiedPost = {
@@ -85,7 +78,7 @@ postsRouter.put("/:postId", (req, res, next) => {
     }
 
     remainingPosts.push(modifiedPost)
-    writePosts(remainingPosts)
+    await writePosts(remainingPosts)
     res.send(modifiedPost)
   } catch (error) {
     console.log(error)
@@ -93,17 +86,69 @@ postsRouter.put("/:postId", (req, res, next) => {
   }
 })
 
-postsRouter.delete("/:postId", (req, res, next) => {
+postsRouter.delete("/:postId", async (req, res, next) => {
   try {
-    const posts = getPosts()
+    const posts = await getPosts()
     const remainingPosts = posts.filter((p) => p._id !== req.params.postId)
 
-    writePosts(remainingPosts)
-    res.status(204).send()
+    await writePosts(remainingPosts)
+    res.status(204).send(remainingPosts)
   } catch (error) {
     console.log(error)
     next(error)
   }
 })
+
+postsRouter.post("/:id/comments", async (req, res, next) => {
+  try {
+    const posts = await getPosts()
+    const post = posts.find((p) => p._id === req.params.id)
+    const comments = post.comments
+    const newComment = { ...req.body, createdAt: new Date() }
+    comments.push(newComment)
+    const remainPosts = posts.filter((p) => p._id !== req.params.id)
+    post.comments = comments
+    remainPosts.push(post)
+    await writePosts(remainPosts)
+
+    res.send(remainPosts)
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
+})
+
+postsRouter.get("/:id/comments", async (req, res, next) => {
+  try {
+    const posts = await getPosts()
+    const post = posts.find((p) => p._id === req.params.id)
+
+    res.send(post.comments)
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
+})
+
+postsRouter.post(
+  "/:id/uploadCover",
+  multer().single("cover"),
+  async (req, res, next) => {
+    try {
+      console.log("trying to upload")
+      const posts = await getPosts()
+      const post = posts.find((p) => p._id === req.params.id)
+      await writePostCover(req.file.originalname, req.file.buffer)
+      post.cover = `http://localhost:3001/img/postCover/${req.file.originalname}`
+      const remainPosts = posts.filter((p) => p._id !== req.params.id)
+      remainPosts.push(post)
+      await writePosts(remainPosts)
+      res.send()
+    } catch (error) {
+      console.log(error)
+      next(error)
+    }
+  }
+)
 
 export default postsRouter
