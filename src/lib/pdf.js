@@ -13,7 +13,7 @@ export const generatePDFStream = (data) => {
   const printer = new PdfPrinter(fonts)
 
   const docDefinition = {
-    content: [data.title],
+    content: [data],
   }
 
   const options = {
