@@ -1,6 +1,8 @@
 import express from "express"
 import { writeAuthorImg, writePostCover } from "../lib/fs-tools.js"
 import multer from "multer"
+import { pipeline } from "stream"
+import { generatePDFStream } from "../lib/pdf.js"
 
 const filesRouter = express.Router()
 
@@ -33,5 +35,16 @@ filesRouter.post(
     }
   }
 )
+
+filesRouter.get("/pdfDownload", async (req, res, next) => {
+  try {
+    const source = generatePDFStream()
+    const destination = res
+    res.setHeader("Content-Disposition", "attachment; filename=export.pdf")
+    pipeline(source, destination, (err) => next(err))
+  } catch (error) {
+    next(error)
+  }
+})
 
 export default filesRouter

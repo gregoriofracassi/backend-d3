@@ -16,7 +16,7 @@ import {
 const server = express()
 
 const port = process.env.PORT || 3001
-
+const whitelist = [process.env.FRONTEND_DEV_URL, process.env.FRONTEND_CLOUD_URL]
 const corsOptions = {
   origin: function (origin, next) {
     if (whitelist.includes(origin)) {
@@ -26,8 +26,6 @@ const corsOptions = {
     }
   },
 }
-
-const whitelist = [process.env.FRONTEND_DEV_URL, process.env.FRONTEND_CLOUD_URL]
 
 const publicFolderPath = join(
   getCurrentFolderPath(import.meta.url),
@@ -42,6 +40,7 @@ server.use(cors(corsOptions))
 // ********ROUTES*********
 server.use("/authors", authorsRoutes)
 server.use("/posts", postsRoutes)
+server.use("/files", filesRoutes)
 
 // ********ERROR MIDDLEWARES**********
 server.use(badRequestErrorHandler)

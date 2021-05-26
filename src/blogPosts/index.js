@@ -6,6 +6,8 @@ import createError from "http-errors"
 import { getPosts, writePosts } from "../lib/fs-tools.js"
 import multer from "multer"
 import { writeAuthorImg, writePostCover } from "../lib/fs-tools.js"
+import { generatePDFStream } from "../lib/pdf.js"
+import { pipeline } from "stream"
 
 const postsRouter = express.Router()
 
@@ -150,5 +152,18 @@ postsRouter.post(
     }
   }
 )
+
+postsRouter.get("/:id/pdfDownload", async (req, res, next) => {
+  const posts = await getPosts()
+  const post = posts.find((p) => p._id === req.params.id)
+  try {
+    const source = generatePDFStream(post)
+    const destination = res
+    res.setHeader("Content-Disposition", "attachment; filename=export.pdf")
+    pipeline(source, destination, (err) => next(err))
+  } catch (error) {
+    next(error)
+  }
+})
 
 export default postsRouter
