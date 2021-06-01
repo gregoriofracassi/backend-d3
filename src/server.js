@@ -16,10 +16,12 @@ import {
 const server = express()
 
 const port = process.env.PORT || 3001
+
 const whitelist = [process.env.FRONTEND_DEV_URL, process.env.FRONTEND_CLOUD_URL]
+
 const corsOptions = {
   origin: function (origin, next) {
-    if (whitelist.includes(origin)) {
+    if (!origin || whitelist.includes(origin)) {
       next(null, true)
     } else {
       next(new Error("Origin is not supported!"))

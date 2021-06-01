@@ -10,6 +10,7 @@ const authorRouter = express.Router()
 
 authorRouter.get("/", async (req, res, next) => {
   try {
+    console.log(process.env.FRONTEND_DEV_URL)
     const authors = await getAuthors()
     res.send(authors)
   } catch (error) {

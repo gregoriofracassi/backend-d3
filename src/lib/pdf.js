@@ -13,7 +13,13 @@ export const generatePDFStream = (data) => {
   const printer = new PdfPrinter(fonts)
 
   const docDefinition = {
-    content: [data],
+    header: `${data.title} by ${data.author.name}`,
+
+    footer: {
+      columns: ["Left part", { text: "Right part", alignment: "right" }],
+    },
+
+    content: [data.content],
   }
 
   const options = {
