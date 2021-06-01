@@ -8,162 +8,168 @@ import multer from "multer"
 import { writeAuthorImg, writePostCover } from "../lib/fs-tools.js"
 import { generatePDFStream } from "../lib/pdf.js"
 import { pipeline } from "stream"
+import PostModel from "./schema.js"
 
 const postsRouter = express.Router()
 
 postsRouter.get("/", async (req, res, next) => {
   try {
-    const posts = await getPosts()
-    if (req.query.title) {
-      //try to validate params and get req with them
-      const filteredPosts = posts.filter(
-        (post) => post.hasOwnProperty("title") && post.title === req.query.title
-      )
-      res.send(filteredPosts)
-    } else {
-      res.send(posts)
-    }
+    const posts = await PostModel.find()
+    res.send(posts)
   } catch (error) {
     console.log(error)
-    next(error)
+    next(createError(500, "An error occurred while getting post"))
   }
 })
 
-postsRouter.get("/:postId", async (req, res, next) => {
+postsRouter.post("/", async (req, res, next) => {
   try {
-    const posts = await getPosts()
-    const post = posts.find((p) => p._id === req.params.postId)
+    const newPost = new PostModel(req.body)
+    const response = await newPost.save()
+    res.status(201).send(response._id)
+  } catch (error) {
+    console.log(error)
+    if (error.name === "ValidationError") {
+      next(createError(400, error))
+    } else {
+      next(createError(500, error))
+    }
+  }
+})
+
+postsRouter.get("/:id", async (req, res, next) => {
+  try {
+    const id = req.params.id
+    const post = await PostModel.findById(id)
     if (post) {
       res.send(post)
     } else {
-      next(createError(404, "Post with this id doesnt exist!"))
+      next(createError(404, `Post ${req.params.id} not found`))
     }
   } catch (error) {
     console.log(error)
-    next(error)
+    next(createError(500, "An error occurred while getting post"))
   }
 })
 
-postsRouter.post("/", bodyValidator, async (req, res, next) => {
+postsRouter.put("/:id", async (req, res, next) => {
   try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      next(createError(400, { errorList: errors }))
+    const post = await PostModel.findByIdAndUpdate(req.params.id, req.body, {
+      runValidators: true,
+      new: true,
+    })
+    if (post) {
+      res.send(post)
     } else {
-      const posts = await getPosts()
-      const newPost = {
-        ...req.body,
-        _id: uniqid(),
-        createdAt: new Date(),
-        comments: [],
-      }
-      posts.push(newPost)
-      await writePosts(posts)
-
-      res.status(201).send({ id: newPost._id })
+      next(createError(404, `Post ${req.params.id} not found`))
     }
   } catch (error) {
     console.log(error)
-    next(error)
+    next(createError(500, "An error occurred while modifying post"))
   }
 })
 
-postsRouter.put("/:postId", bodyValidator, async (req, res, next) => {
+postsRouter.delete("/:id", async (req, res, next) => {
   try {
-    const posts = await getPosts()
-    const remainingPosts = posts.filter((p) => p._id !== req.params.postId)
-
-    const modifiedPost = {
-      ...req.body,
-      _id: req.params.postId,
-      modifiedAt: new Date(),
+    const post = await PostModel.findByIdAndDelete(req.params.id)
+    if (post) {
+      res.status(204).send(`Succesfully deleted post ${req.params.id}`)
+    } else {
+      next(createError(404, `Post ${req.params.id} not found`))
     }
-
-    remainingPosts.push(modifiedPost)
-    await writePosts(remainingPosts)
-    res.send(modifiedPost)
   } catch (error) {
     console.log(error)
-    next(error)
+    next(createError(500, "An error occurred while deleting the post"))
   }
 })
 
-postsRouter.delete("/:postId", async (req, res, next) => {
-  try {
-    const posts = await getPosts()
-    const remainingPosts = posts.filter((p) => p._id !== req.params.postId)
+// postsRouter.post("/:id/comments", async (req, res, next) => {
+//   try {
+//     const posts = await getPosts()
+//     const post = posts.find((p) => p._id === req.params.id)
+//     const comments = post.comments
+//     const newComment = { ...req.body, createdAt: new Date() }
+//     comments.push(newComment)
+//     const remainPosts = posts.filter((p) => p._id !== req.params.id)
+//     post.comments = comments
+//     remainPosts.push(post)
+//     await writePosts(remainPosts)
 
-    await writePosts(remainingPosts)
-    res.status(204).send(remainingPosts)
-  } catch (error) {
-    console.log(error)
-    next(error)
-  }
-})
+//     res.send(remainPosts)
+//   } catch (error) {
+//     console.log(error)
+//     next(error)
+//   }
+// })
 
-postsRouter.post("/:id/comments", async (req, res, next) => {
-  try {
-    const posts = await getPosts()
-    const post = posts.find((p) => p._id === req.params.id)
-    const comments = post.comments
-    const newComment = { ...req.body, createdAt: new Date() }
-    comments.push(newComment)
-    const remainPosts = posts.filter((p) => p._id !== req.params.id)
-    post.comments = comments
-    remainPosts.push(post)
-    await writePosts(remainPosts)
+// postsRouter.post("/", bodyValidator, async (req, res, next) => {
+//   try {
+//     const errors = validationResult(req)
+//     if (!errors.isEmpty()) {
+//       next(createError(400, { errorList: errors }))
+//     } else {
+//       const posts = await getPosts()
+//       const newPost = {
+//         ...req.body,
+//         _id: uniqid(),
+//         createdAt: new Date(),
+//         comments: [],
+//       }
+//       posts.push(newPost)
+//       await writePosts(posts)
 
-    res.send(remainPosts)
-  } catch (error) {
-    console.log(error)
-    next(error)
-  }
-})
+//       res.status(201).send({ id: newPost._id })
+//     }
+//   } catch (error) {
+//     console.log(error)
+//     next(error)
+//   }
+// })
 
-postsRouter.get("/:id/comments", async (req, res, next) => {
-  try {
-    const posts = await getPosts()
-    const post = posts.find((p) => p._id === req.params.id)
+// postsRouter.get("/:id/comments", async (req, res, next) => {
+//   try {
+//     const posts = await getPosts()
+//     const post = posts.find((p) => p._id === req.params.id)
 
-    res.send(post.comments)
-  } catch (error) {
-    console.log(error)
-    next(error)
-  }
-})
+//     res.send(post.comments)
+//   } catch (error) {
+//     console.log(error)
+//     next(error)
+//   }
+// })
 
-postsRouter.post(
-  "/:id/uploadCover",
-  multer().single("cover"),
-  async (req, res, next) => {
-    try {
-      console.log("trying to upload")
-      const posts = await getPosts()
-      const post = posts.find((p) => p._id === req.params.id)
-      await writePostCover(req.file.originalname, req.file.buffer)
-      post.cover = `http://localhost:3001/img/postCover/${req.file.originalname}`
-      const remainPosts = posts.filter((p) => p._id !== req.params.id)
-      remainPosts.push(post)
-      await writePosts(remainPosts)
-      res.send()
-    } catch (error) {
-      console.log(error)
-      next(error)
-    }
-  }
-)
+// postsRouter.post(
+//   "/:id/uploadCover",
+//   multer().single("cover"),
+//   async (req, res, next) => {
+//     try {
+//       console.log("trying to upload")
+//       const posts = await getPosts()
+//       const post = posts.find((p) => p._id === req.params.id)
+//       await writePostCover(req.file.originalname, req.file.buffer)
+//       post.cover = `http://localhost:3001/img/postCover/${req.file.originalname}`
+//       const remainPosts = posts.filter((p) => p._id !== req.params.id)
+//       remainPosts.push(post)
+//       await writePosts(remainPosts)
+//       res.send()
+//     } catch (error) {
+//       console.log(error)
+//       next(error)
+//     }
+//   }
+// )
 
-postsRouter.get("/:id/pdfDownload", async (req, res, next) => {
-  const posts = await getPosts()
-  const post = posts.find((p) => p._id === req.params.id)
-  try {
-    const source = generatePDFStream(post)
-    const destination = res
-    res.setHeader("Content-Disposition", "attachment; filename=export.pdf")
-    pipeline(source, destination, (err) => next(err))
-  } catch (error) {
-    next(error)
-  }
-})
+// postsRouter.get("/:id/pdfDownload", async (req, res, next) => {
+//   const posts = await getPosts()
+//   const post = posts.find((p) => p._id === req.params.id)
+//   try {
+//     const source = generatePDFStream(post)
+//     const destination = res
+//     res.setHeader("Content-Disposition", "attachment; filename=export.pdf")
+//     pipeline(source, destination, (err) => next(err))
+//   } catch (error) {
+//     next(error)
+//   }
+// })
 
 export default postsRouter

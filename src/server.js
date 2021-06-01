@@ -12,6 +12,7 @@ import {
   forbiddenErrorHandler,
   catchAllErrorHandler,
 } from "./errorHandlers.js"
+import mongoose from "mongoose"
 
 const server = express()
 
@@ -51,7 +52,16 @@ server.use(forbiddenErrorHandler)
 server.use(catchAllErrorHandler)
 
 console.table(listEndpoints(server))
-
-server.listen(port, () => {
-  console.log("Server listening on port ", port)
-})
+// console.log(process.env.MONGO_CONNECTION)
+mongoose
+  .connect(process.env.MONGO_CONNECTION, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useFindAndModify: false,
+  })
+  .then(
+    server.listen(port, () => {
+      console.log("Running on port", port)
+    })
+  )
+  .catch((err) => console.log(err))

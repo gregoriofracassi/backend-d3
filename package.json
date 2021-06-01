@@ -1,25 +1,17 @@
 {
-  "name": "backend-d3",
+  "name": "netflix-backend",
   "version": "1.0.0",
-  "type": "module",
   "description": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon ./src/server.js -r dotenv/config",
+    "dev": "nodemon -e js -r dotenv/config ./src/server.js",
     "start": "node ./src/server.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/gregoriofracassi/backend-d3.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/gregoriofracassi/backend-d3/issues"
-  },
-  "homepage": "https://github.com/gregoriofracassi/backend-d3#readme",
   "dependencies": {
     "cloudinary": "^1.25.1",
     "cors": "^2.8.5",
@@ -28,10 +20,13 @@
     "express-validator": "^6.11.1",
     "fs-extra": "^10.0.0",
     "http-errors": "^1.8.0",
+    "mongoose": "^5.12.12",
     "multer": "^1.4.2",
     "multer-storage-cloudinary": "^4.0.0",
+    "node-fetch": "^2.6.1",
     "pdfmake": "^0.1.71",
-    "uniqid": "^5.3.0"
+    "uniqid": "^5.3.0",
+    "validator": "^13.6.0"
   },
   "devDependencies": {
     "dotenv": "^10.0.0",
