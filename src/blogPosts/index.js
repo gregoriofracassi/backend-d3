@@ -83,6 +83,139 @@ postsRouter.delete("/:id", async (req, res, next) => {
   }
 })
 
+postsRouter.post("/:id/comments", async (req, res, next) => {
+  try {
+    const comment = req.body
+    const post = await PostModel.findById(req.params.id)
+    if (post) {
+      const updatePostComments = await PostModel.findByIdAndUpdate(
+        req.params.id,
+        {
+          $push: {
+            comments: comment,
+          },
+        },
+        {
+          runValidators: true,
+          new: true,
+        }
+      )
+      res.status(201).send(updatePostComments)
+    } else {
+      next(createError(404, "post not found"))
+    }
+  } catch (error) {
+    next(createError(500, "an error occurred while adding a comment"))
+  }
+})
+
+postsRouter.get("/:id/comments", async (req, res, next) => {
+  try {
+    const post = await PostModel.findById(req.params.id, { comments: 1 })
+    if (post) {
+      res.send(post.comments)
+    } else {
+      next(404, "no post found with this id")
+    }
+  } catch (error) {
+    console.log(error)
+    next(createError(500, "an error occurred while getting posts comments"))
+  }
+})
+
+postsRouter.get("/:id/comments/:commentId", async (req, res, next) => {
+  try {
+    const post = await PostModel.findOne(
+      {
+        _id: req.params.id,
+      },
+      {
+        comments: {
+          $elemMatch: { _id: req.params.commentId },
+        },
+      }
+    )
+    if (post) {
+      const { comments } = post
+      if (comments && comments.length > 0) {
+        res.send(comments[0])
+      } else {
+        next(createError(404, "no comments found for this post"))
+      }
+    } else {
+      next(createError(404, "no posts found with this id"))
+    }
+  } catch (error) {
+    console.log(error)
+    next(
+      createError(
+        500,
+        "An error occurred while retrievieng a comment from the given post"
+      )
+    )
+  }
+})
+
+postsRouter.put("/:id/comments/:commentId", async (req, res, next) => {
+  try {
+    const post = await PostModel.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        "comments._id": req.params.commentId,
+      },
+      {
+        $set: { "comments.$": req.body },
+      },
+      {
+        runValidators: true,
+        new: true,
+      }
+    )
+    if (post) {
+      res.send(post)
+    } else {
+      next(createError(404, "no post found with this id"))
+    }
+  } catch (error) {
+    console.log(error)
+    next(
+      createError(
+        500,
+        "an error occurred while updating a comment on the given post"
+      )
+    )
+  }
+})
+
+postsRouter.delete("/:id/comments/:commentId", async (req, res, next) => {
+  try {
+    const post = await PostModel.findByIdAndUpdate(
+      req.params.id,
+      {
+        $pull: {
+          comments: { _id: req.params.commentId },
+        },
+      },
+      {
+        new: true,
+      }
+    )
+    if (post) {
+      res.send(post)
+    } else {
+      next(createError(404, "No post found with this id"))
+    }
+  } catch (error) {
+    console.log(error)
+    next(
+      createError(
+        500,
+        "an error occurred while deleting a comment for a given post"
+      )
+    )
+  }
+})
+
 // postsRouter.post("/:id/comments", async (req, res, next) => {
 //   try {
 //     const posts = await getPosts()

@@ -35,6 +35,12 @@ const PostSchema = new Schema(
       type: String,
       required: true,
     },
+    comments: [
+      {
+        author: String,
+        content: String,
+      },
+    ],
   },
   { timestamps: true }
 )
