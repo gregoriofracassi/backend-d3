@@ -9,13 +9,20 @@ import { writeAuthorImg, writePostCover } from "../lib/fs-tools.js"
 import { generatePDFStream } from "../lib/pdf.js"
 import { pipeline } from "stream"
 import PostModel from "./schema.js"
+import q2m from "query-to-mongo"
 
 const postsRouter = express.Router()
 
 postsRouter.get("/", async (req, res, next) => {
   try {
-    const posts = await PostModel.find()
-    res.send(posts)
+    const query = q2m(req.query)
+    console.log(query)
+    const total = await PostModel.countDocuments(query.criteria)
+    const posts = await PostModel.find(query.criteria, query.options.fields)
+      .sort(query.options.sort)
+      .skip(query.options.skip)
+      .limit(query.options.limit)
+    res.send({ link: query.links("/posts", total), total, posts })
   } catch (error) {
     console.log(error)
     next(createError(500, "An error occurred while getting post"))
