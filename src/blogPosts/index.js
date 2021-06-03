@@ -19,6 +19,7 @@ postsRouter.get("/", async (req, res, next) => {
     console.log(query)
     const total = await PostModel.countDocuments(query.criteria)
     const posts = await PostModel.find(query.criteria, query.options.fields)
+      .populate(["author", "likedBy"])
       .sort(query.options.sort)
       .skip(query.options.skip)
       .limit(query.options.limit)
@@ -47,7 +48,11 @@ postsRouter.post("/", async (req, res, next) => {
 postsRouter.get("/:id", async (req, res, next) => {
   try {
     const id = req.params.id
-    const post = await PostModel.findById(id)
+    const post = await PostModel.findById(id).populate([
+      "author",
+      "likedBy",
+      "comments.author",
+    ])
     if (post) {
       res.send(post)
     } else {
@@ -92,6 +97,7 @@ postsRouter.delete("/:id", async (req, res, next) => {
 
 postsRouter.post("/:id/comments", async (req, res, next) => {
   try {
+    console.log("adding comment")
     const comment = req.body
     const post = await PostModel.findById(req.params.id)
     if (post) {
@@ -220,6 +226,33 @@ postsRouter.delete("/:id/comments/:commentId", async (req, res, next) => {
         "an error occurred while deleting a comment for a given post"
       )
     )
+  }
+})
+
+postsRouter.post("/:id/like", async (req, res, next) => {
+  try {
+    console.log("adding like")
+    const post = await PostModel.findById(req.params.id)
+    if (post) {
+      const updatedPost = await PostModel.findByIdAndUpdate(
+        req.params.id,
+        {
+          $push: {
+            likedBy: req.body.id,
+          },
+        },
+        {
+          runValidators: true,
+          new: true,
+        }
+      )
+      res.status(201).send({ totalPostLikes: updatedPost.likedBy.length })
+    } else {
+      next(createError(404, "no posts found with this id"))
+    }
+  } catch (error) {
+    console.log(error)
+    next(createError(500, "an error occurred while liking this post"))
   }
 })
 

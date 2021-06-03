@@ -35,9 +35,11 @@ const PostSchema = new Schema(
       type: String,
       required: true,
     },
+    author: [{ type: Schema.Types.ObjectId, required: true, ref: "Author" }],
+    likedBy: [{ type: Schema.Types.ObjectId, ref: "Author" }],
     comments: [
       {
-        author: String,
+        author: { type: Schema.Types.ObjectId, required: true, ref: "Author" },
         content: String,
       },
     ],

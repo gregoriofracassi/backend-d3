@@ -1,46 +1,47 @@
 import express from "express"
-import fs from "fs"
-import uniqid from "uniqid"
+import q2m from "query-to-mongo"
 import createError from "http-errors"
-import { getAuthors, writeAuthors } from "../lib/fs-tools.js"
-import multer from "multer"
-import { writeAuthorImg, writePostCover } from "../lib/fs-tools.js"
 
-const authorRouter = express.Router()
+import AuthorModel from "./schema.js"
 
-authorRouter.get("/", async (req, res, next) => {
+const authorsRouter = express.Router()
+
+authorsRouter.post("/", async (req, res, next) => {
   try {
-    console.log(process.env.FRONTEND_DEV_URL)
-    const authors = await getAuthors()
-    res.send(authors)
+    const newAuthor = new AuthorModel(req.body)
+    const { _id } = await newAuthor.save()
+
+    res.status(201).send(_id)
+  } catch (error) {
+    console.log(error)
+    next(createError(500, "An error occurred while saving new author"))
+  }
+})
+
+authorsRouter.get("/", async (req, res, next) => {
+  try {
+    const query = q2m(req.query)
+    const total = await AuthorModel.countDocuments(query.criteria)
+
+    const authors = await AuthorModel.find(query.criteria, query.options.fields)
+      .skip(query.options.skip)
+      .limit(query.options.limit)
+      .sort(query.options.sort)
+
+    res.send({ links: query.links("/author", total), total, authors })
   } catch (error) {
     console.log(error)
     next(error)
   }
 })
 
-authorRouter.post("/", async (req, res, next) => {
+authorsRouter.get("/:id", async (req, res, next) => {
   try {
-    const authors = await getAuthors()
-    const newAuthor = { ...req.body, _id: uniqid(), createdAt: new Date() }
-    authors.push(newAuthor)
-    await writeAuthors(authors)
-
-    res.status(201).send({ _id: newAuthor._id })
-  } catch (error) {
-    console.log(error)
-    next(error)
-  }
-})
-
-authorRouter.get("/:id", async (req, res, next) => {
-  try {
-    const authors = await getAuthors()
-    const author = authors.find((a) => a._id === req.params.id)
+    const author = await AuthorModel.findById(req.params.id)
     if (author) {
       res.send(author)
     } else {
-      next(createError(404, "Author with this id not found"))
+      next(createError(404, `Author ${req.params.id} not found`))
     }
   } catch (error) {
     console.log(error)
@@ -48,57 +49,39 @@ authorRouter.get("/:id", async (req, res, next) => {
   }
 })
 
-authorRouter.put("/:id", async (req, res, next) => {
+authorsRouter.put("/:id", async (req, res, next) => {
   try {
-    const authors = await getAuthors()
-    const remainAuthors = authors.filter((a) => a._id !== req.params.id)
-
-    const modifiedAuthor = {
-      ...req.body,
-      _id: req.params.id,
-      modifiedAt: new Date(),
+    const modifiedAuthor = await AuthorModel.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      {
+        runValidators: true,
+        new: true,
+      }
+    )
+    if (modifiedAuthor) {
+      res.send(modifiedAuthor)
+    } else {
+      next(createError(404, `Author ${req.params.id} not found`))
     }
-    remainAuthors.push(modifiedAuthor)
-    await writeAuthors(remainAuthors)
-    res.send(modifiedAuthor)
   } catch (error) {
     console.log(error)
     next(error)
   }
 })
 
-authorRouter.delete("/:id", async (req, res, next) => {
+authorsRouter.delete("/:id", async (req, res, next) => {
   try {
-    const authors = await getAuthors()
-    const remainAuthors = authors.filter((a) => a._id !== req.params.id)
-
-    await writeAuthors(remainAuthors)
-    res.status(204).send(remainAuthors)
+    const author = await AuthorModel.findByIdAndDelete(req.params.id)
+    if (author) {
+      res.send(author)
+    } else {
+      next(createError(404, `Author ${req.params.id} not found`))
+    }
   } catch (error) {
     console.log(error)
     next(error)
   }
 })
 
-authorRouter.post(
-  "/:id/uploadAvatar",
-  multer().single("avatar"),
-  async (req, res, next) => {
-    try {
-      console.log("trying to upload")
-      const authors = await getAuthors()
-      const author = authors.find((a) => a._id === req.params.id)
-      await writeAuthorImg(req.file.originalname, req.file.buffer)
-      author.img = `http://localhost:3001/img/authors/${req.file.originalname}`
-      const remainAuthors = authors.filter((a) => a._id !== req.params.id)
-      remainAuthors.push(author)
-      await writeAuthors(remainAuthors)
-      res.send()
-    } catch (error) {
-      console.log(error)
-      next(error)
-    }
-  }
-)
-
-export default authorRouter
+export default authorsRouter
